@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { LoginCard } from './GoogleLogin'
-import { Landing } from './Landing'
+import Landing from './Landing'
 import { About } from './About'
 import { Chat } from './Chat'
 import { Forum } from './Forum'
@@ -39,8 +39,21 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin" />
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(to bottom right, #EDE8DC, #F5F0E6)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          width: '32px',
+          height: '32px',
+          border: '4px solid #D6CDB8',
+          borderTop: '4px solid #8B7355',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }} />
       </div>
     )
   }
@@ -61,8 +74,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/about" element={<About />} />
+        <Route path="/" element={<Landing user={user} onLogout={handleLogout} />} />
+        <Route path="/about" element={<About user={user} onLogout={handleLogout} />} />
         <Route path="/chat" element={<Chat user={user} onLogout={handleLogout} />} />
         <Route path="/forum" element={<Forum user={user} onLogout={handleLogout} />} />
         <Route path="/forum/:id" element={<ForumDetail user={user} onLogout={handleLogout} />} />

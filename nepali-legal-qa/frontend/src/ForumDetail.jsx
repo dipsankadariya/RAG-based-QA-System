@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowDown, ArrowUp, ChevronLeft, MessageSquare, Scale } from 'lucide-react'
+import { Navbar } from './Navbar'
 import { UserProfile } from './GoogleLogin'
 
 const API_BASE = (import.meta.env.VITE_FORUM_API_BASE ?? '').replace(/\/$/, '')
@@ -20,6 +21,7 @@ async function forumRequest(path, options = {}) {
   const res = await fetch(`${FORUM_BASE}${path}`, {
     ...options,
     headers,
+    credentials: 'include',
   })
 
   if (!res.ok) {
@@ -135,73 +137,33 @@ export function ForumDetail({ user, onLogout }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#fff', fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif" }}>
-      <header
-        style={{
-          borderBottom: '1px solid #E8E6E0',
-          background: '#fff',
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-        }}
-      >
-        <div
+    <div style={{ minHeight: '100vh', background: '#EDE8DC', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif" }}>
+      <Navbar user={user} onLogout={onLogout} />
+      
+      {/* Back button bar */}
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '16px 32px 0', display: 'flex', alignItems: 'center' }}>
+        <Link
+          to="/forum"
           style={{
-            maxWidth: 1400,
-            margin: '0 auto',
-            padding: '0 32px',
-            height: 56,
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            gap: 6,
+            fontSize: 12,
+            fontWeight: 600,
+            color: '#8B7355',
+            border: '1.5px solid #8B7355',
+            borderRadius: 100,
+            padding: '6px 14px',
+            textDecoration: 'none',
+            letterSpacing: '0.01em',
+            transition: 'background 0.15s',
           }}
+          onMouseEnter={e => e.currentTarget.style.background = '#F5F0E6'}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 10,
-                background: '#2D2059',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Scale size={16} color="#fff" aria-hidden="true" />
-            </div>
-            <div>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#1A1A1A', letterSpacing: '-0.01em' }}>Legal Forum</p>
-              <p style={{ margin: 0, fontSize: 11, color: '#9B9690' }}>Question detail</p>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Link
-              to="/forum"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                color: '#2D2059',
-                border: '1.5px solid #2D2059',
-                borderRadius: 100,
-                padding: '6px 14px',
-                textDecoration: 'none',
-                letterSpacing: '0.01em',
-                transition: 'background 0.15s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = '#F0EEF9'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              <ChevronLeft size={13} aria-hidden="true" /> Back
-            </Link>
-            {user && <UserProfile user={user} onLogout={onLogout} />}
-          </div>
-        </div>
-      </header>
+          <ChevronLeft size={13} aria-hidden="true" /> Back to Forum
+        </Link>
+      </div>
 
       <main
         style={{

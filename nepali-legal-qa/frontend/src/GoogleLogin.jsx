@@ -1,5 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 
+// Add animations
+const style = document.createElement('style')
+style.textContent = `
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+`
+document.head.appendChild(style)
+
 export function GoogleLoginButton({ onLoginSuccess, onLoginError }) {
   const buttonRef = useRef(null)
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -59,6 +73,7 @@ export function GoogleLoginButton({ onLoginSuccess, onLoginError }) {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ token: response.credential }),
       })
 
@@ -80,17 +95,29 @@ export function GoogleLoginButton({ onLoginSuccess, onLoginError }) {
 
   if (!GOOGLE_CLIENT_ID) {
     return (
-      <div className="p-4 bg-amber-50 border border-amber-200 rounded-md text-center">
-        <p className="text-sm text-amber-800 font-medium">⚠️ Google authentication not configured</p>
-        <p className="text-xs text-amber-700 mt-1">Set VITE_GOOGLE_CLIENT_ID in your .env.local file</p>
+      <div style={{
+        padding: '16px',
+        background: '#FEF3C7',
+        border: '1px solid #FBBF24',
+        borderRadius: '8px',
+        textAlign: 'center'
+      }}>
+        <p style={{ fontSize: '14px', color: '#92400E', fontWeight: '500' }}>⚠️ Google authentication not configured</p>
+        <p style={{ fontSize: '12px', color: '#B45309', marginTop: '4px' }}>Set VITE_GOOGLE_CLIENT_ID in your .env.local file</p>
       </div>
     )
   }
 
   return (
-    <div className="flex justify-center">
+    <div style={{ display: 'flex', justifyContent: 'center' }}>
       {isLoading && (
-        <div className="w-full h-11 bg-gray-200 rounded-md animate-pulse" />
+        <div style={{
+          width: '100%',
+          height: '44px',
+          background: '#D6CDB8',
+          borderRadius: '8px',
+          animation: 'pulse 2s infinite'
+        }} />
       )}
       <div ref={buttonRef} style={{ minHeight: isLoading ? '0' : 'auto' }} />
     </div>
@@ -101,59 +128,139 @@ export function LoginCard({ onLoginSuccess }) {
   const [error, setError] = useState(null)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex">
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #EDE8DC, #F5F0E6)', display: 'flex' }}>
       {/* Left Side - Visual Section */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 relative overflow-hidden flex-col items-center justify-center p-12">
+      <div style={{
+        display: 'none',
+        width: '50%',
+        background: 'linear-gradient(to bottom right, #8B7355, #6B563D)',
+        position: 'relative',
+        overflow: 'hidden',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '48px',
+        '@media (min-width: 1024px)': { display: 'flex' }
+      }}>
         {/* Decorative Elements */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse delay-2000"></div>
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          width: '384px',
+          height: '384px',
+          background: '#A08B6F',
+          borderRadius: '50%',
+          opacity: 0.2,
+          filter: 'blur(3rem)',
+          animation: 'pulse 3s infinite'
+        }}></div>
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          width: '384px',
+          height: '384px',
+          background: '#9B8263',
+          borderRadius: '50%',
+          opacity: 0.2,
+          filter: 'blur(3rem)',
+          animation: 'pulse 3s infinite 2s'
+        }}></div>
         
         {/* Content */}
-        <div className="relative z-10 text-center max-w-md">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl text-white mb-8 border border-white/30">
+        <div style={{
+          position: 'relative',
+          zIndex: 10,
+          textAlign: 'center',
+          maxWidth: '448px'
+        }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '64px',
+            height: '64px',
+            background: 'rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(12px)',
+            borderRadius: '16px',
+            color: '#FFFFFF',
+            marginBottom: '32px',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+          }}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 1L3 5v6c0 5.25 3.75 10.15 9 11.35C17.25 21.15 21 16.25 21 11V5L12 1z" />
             </svg>
           </div>
           
-          <h2 className="text-4xl font-bold text-white mb-4">न्याय</h2>
-          <p className="text-lg text-purple-100 mb-8">Your AI-powered guide to Nepali legal insights</p>
+          <h2 style={{ fontSize: '36px', fontWeight: 'bold', color: '#FFFFFF', marginBottom: '16px' }}>न्याय</h2>
+          <p style={{ fontSize: '18px', color: '#E6D9C4', marginBottom: '32px' }}>Your AI-powered guide to Nepali legal insights</p>
           
           {/* Feature List */}
-          <div className="space-y-4 text-left">
-            <div className="flex items-start gap-3">
-              <div className="mt-1 w-5 h-5 rounded-full bg-white/30 flex items-center justify-center flex-shrink-0">
-                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <div style={{
+                marginTop: '4px',
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <svg className="w-3 h-3" fill="white" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
               </div>
               <div>
-                <p className="text-white font-medium">Instant Legal Answers</p>
-                <p className="text-sm text-purple-200">Get answers to legal questions 24/7</p>
+                <p style={{ color: '#FFFFFF', fontWeight: '500' }}>Instant Legal Answers</p>
+                <p style={{ fontSize: '14px', color: '#D6CDB8' }}>Get answers to legal questions 24/7</p>
               </div>
             </div>
             
-            <div className="flex items-start gap-3">
-              <div className="mt-1 w-5 h-5 rounded-full bg-white/30 flex items-center justify-center flex-shrink-0">
-                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <div style={{
+                marginTop: '4px',
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <svg className="w-3 h-3" fill="white" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
               </div>
               <div>
-                <p className="text-white font-medium">Nepali Legal Context</p>
-                <p className="text-sm text-purple-200">Guidance specific to Nepal</p>
+                <p style={{ color: '#FFFFFF', fontWeight: '500' }}>Nepali Legal Context</p>
+                <p style={{ fontSize: '14px', color: '#D6CDB8' }}>Guidance specific to Nepal</p>
               </div>
             </div>
             
-            <div className="flex items-start gap-3">
-              <div className="mt-1 w-5 h-5 rounded-full bg-white/30 flex items-center justify-center flex-shrink-0">
-                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <div style={{
+                marginTop: '4px',
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <svg className="w-3 h-3" fill="white" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
               </div>
               <div>
-                <p className="text-white font-medium">Conversational Interface</p>
-                <p className="text-sm text-purple-200">Chat naturally about legal matters</p>
+                <p style={{ color: '#FFFFFF', fontWeight: '500' }}>Conversational Interface</p>
+                <p style={{ fontSize: '14px', color: '#D6CDB8' }}>Chat naturally about legal matters</p>
               </div>
             </div>
           </div>
@@ -161,25 +268,41 @@ export function LoginCard({ onLoginSuccess }) {
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-6 sm:px-12">
-        <div className="w-full max-w-sm">
+      <div style={{
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingLeft: '24px',
+        paddingRight: '24px'
+      }}>
+        <div style={{ width: '100%', maxWidth: '400px' }}>
           {/* Header */}
-          <div className="mb-10">
-            <div className="lg:hidden flex items-center gap-3 mb-8">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg text-white">
+          <div style={{ marginBottom: '40px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '48px',
+                height: '48px',
+                background: 'linear-gradient(to bottom right, #8B7355, #6B563D)',
+                borderRadius: '8px',
+                color: '#FFFFFF'
+              }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 1L3 5v6c0 5.25 3.75 10.15 9 11.35C17.25 21.15 21 16.25 21 11V5L12 1z" />
                 </svg>
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">न्याय</h1>
+              <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1a1208' }}>न्याय</h1>
             </div>
             
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h2>
-            <p className="text-gray-600">Sign in to your account to continue</p>
+            <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1a1208', marginBottom: '8px' }}>Welcome Back</h2>
+            <p style={{ color: '#5A5245' }}>Sign in to your account to continue</p>
           </div>
 
           {/* Login Form */}
-          <div className="space-y-5">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Google Login Button */}
             <GoogleLoginButton
               onLoginSuccess={onLoginSuccess}
@@ -188,19 +311,43 @@ export function LoginCard({ onLoginSuccess }) {
 
             {/* Error Message */}
             {error && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg animate-in fade-in">
-                <p className="text-sm text-red-700 font-medium">Sign in failed</p>
-                <p className="text-sm text-red-600 mt-1">{error}</p>
+              <div style={{
+                padding: '16px',
+                background: '#FEE2E2',
+                border: '1px solid #FCA5A5',
+                borderRadius: '8px'
+              }}>
+                <p style={{ fontSize: '14px', color: '#991B1B', fontWeight: '500' }}>Sign in failed</p>
+                <p style={{ fontSize: '14px', color: '#DC2626', marginTop: '4px' }}>{error}</p>
               </div>
             )}
 
             {/* Divider */}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
+            <div style={{ position: 'relative' }}>
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <div style={{
+                  width: '100%',
+                  borderTop: '1px solid #C4BAA8'
+                }} />
               </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-3 bg-gradient-to-br from-slate-50 to-slate-100 text-gray-500 font-medium">Or</span>
+              <div style={{
+                position: 'relative',
+                display: 'flex',
+                justifyContent: 'center',
+                fontSize: '14px'
+              }}>
+                <span style={{
+                  paddingLeft: '12px',
+                  paddingRight: '12px',
+                  background: 'linear-gradient(to bottom right, #EDE8DC, #F5F0E6)',
+                  color: '#8B7355',
+                  fontWeight: '500'
+                }}>Or</span>
               </div>
             </div>
 
@@ -211,19 +358,43 @@ export function LoginCard({ onLoginSuccess }) {
                 localStorage.setItem('user_info', JSON.stringify({ name: 'Guest', email: '', sub: 'guest', picture: null }))
                 onLoginSuccess?.({ user: { name: 'Guest', email: '', sub: 'guest', picture: null } })
               }}
-              className="w-full px-4 py-3 text-sm font-semibold text-gray-700 border-2 border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 active:scale-95"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#1a1208',
+                border: '2px solid #C4BAA8',
+                borderRadius: '8px',
+                background: '#FFFFFF',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = '#F5F0E6'
+                e.target.style.borderColor = '#8B7355'
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = '#FFFFFF'
+                e.target.style.borderColor = '#C4BAA8'
+              }}
             >
               Continue as Guest
             </button>
 
             {/* Footer Text */}
-            <p className="text-center text-xs text-gray-500 pt-2">
+            <p style={{
+              textAlign: 'center',
+              fontSize: '12px',
+              color: '#8B7355',
+              paddingTop: '8px'
+            }}>
               By signing in, you agree to our{' '}
-              <a href="#" className="text-purple-600 font-semibold hover:underline">
+              <a href="#" style={{ color: '#8B7355', fontWeight: '600', textDecoration: 'none' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
                 Terms
               </a>
               {' '}and{' '}
-              <a href="#" className="text-purple-600 font-semibold hover:underline">
+              <a href="#" style={{ color: '#8B7355', fontWeight: '600', textDecoration: 'none' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
                 Privacy
               </a>
             </p>

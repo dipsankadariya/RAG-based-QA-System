@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { Navbar } from './Navbar'
 import { UserProfile } from './GoogleLogin'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -11,6 +12,7 @@ async function queryLegal(question, topK = 5) {
   const token = localStorage.getItem('auth_token')
   const headers = {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   }
   
   if (token) {
@@ -20,6 +22,7 @@ async function queryLegal(question, topK = 5) {
   const res = await fetch(endpoint, {
     method: 'POST',
     headers,
+    credentials: 'include',
     body: JSON.stringify({ question, top_k: topK, mode: 'hyde' }),
   })
   if (!res.ok) {
@@ -34,6 +37,7 @@ async function queryLegalWithMode(question, topK, mode) {
   const token = localStorage.getItem('auth_token')
   const headers = {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   }
 
   if (token) {
@@ -43,6 +47,7 @@ async function queryLegalWithMode(question, topK, mode) {
   const res = await fetch(endpoint, {
     method: 'POST',
     headers,
+    credentials: 'include',
     body: JSON.stringify({ question, top_k: topK, mode }),
   })
   if (!res.ok) {
@@ -184,8 +189,6 @@ function AnswerCard({ title, label, answer, bgGradient, icon }) {
   )
 }
 
- 
-
 function PipelineStep({ num, label, status }) {
   const ring = {
     waiting: 'w-8 h-8 rounded-full border-2 border-gray-200 bg-white text-gray-300 text-xs font-semibold flex items-center justify-center flex-shrink-0',
@@ -244,7 +247,7 @@ export function Chat({ user, onLogout }) {
   const [showEnglish, setShowEnglish] = useState(false)
   
   const textareaRef = useRef(null)
-  const resultsRef = useRef(null)
+  const scrollRef = useRef(null)
 
   useEffect(() => {
     const ta = textareaRef.current
@@ -252,6 +255,15 @@ export function Chat({ user, onLogout }) {
     ta.style.height = 'auto'
     ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`
   }, [question])
+
+  // Auto-scroll to bottom of results when new result arrives
+  useEffect(() => {
+    if (result || error) {
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+      }, 100)
+    }
+  }, [result, error])
 
   const handleSubmit = useCallback(async (q = question) => {
     const trimmed = q.trim()
@@ -271,7 +283,6 @@ export function Chat({ user, onLogout }) {
       clearTimeout(t1)
       clearTimeout(t2)
       setHistory(h => [{ question: trimmed, time: new Date().toLocaleTimeString() }, ...h].slice(0, 6))
-      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
     } catch (e) {
       clearTimeout(t1)
       clearTimeout(t2)
@@ -289,135 +300,82 @@ export function Chat({ user, onLogout }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f7ff] flex flex-col">
-      <header className="bg-white border-b border-purple-100 sticky top-0 z-10 shadow-sm shadow-purple-50">
-        <div className="max-w-5xl mx-auto px-5 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center text-white flex-shrink-0">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 1L3 5v6c0 5.25 3.75 10.15 9 11.35C17.25 21.15 21 16.25 21 11V5L12 1z" />
-              </svg>
-            </div>
-            <span className="text-sm font-semibold text-gray-900">नेपाली कानूनी सहायक</span>
-            <span className="hidden sm:block text-xs text-gray-300">/ HyDE + Agent</span>
-          </div>
-          <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-[11px] text-purple-600 font-medium bg-purple-50 border border-purple-100 rounded-full px-3 py-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span className="hidden sm:block">Mode</span>
-                <select
-                  value={mode}
-                  onChange={(e) => setMode(e.target.value)}
-                  disabled={loading}
-                  className="bg-transparent outline-none text-[11px] font-semibold text-purple-700 disabled:opacity-50 cursor-pointer"
-                >
-                  <option value="hyde">HyDE (fast)</option>
-                  <option value="agent">Agent (deep)</option>
-                </select>
-              </div>
-            <Link
-              to="/forum"
-              className="hidden md:inline-flex items-center px-3 py-1.5 text-[11px] font-semibold rounded-full border border-purple-200 text-purple-700 hover:bg-purple-50 transition-colors"
-            >
-              Forum
-            </Link>
-            {user && <UserProfile user={user} onLogout={onLogout} />}
-          </div>
-        </div>
-      </header>
+    <div
+      className="h-screen flex flex-col overflow-hidden"
+      style={{
+        background: '#EDE8DC',
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif",
+      }}
+    >
+      <Navbar user={user} onLogout={onLogout} />
 
-      <div className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-5 py-6 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-5 items-start">
-        <aside className="space-y-4 lg:sticky lg:top-20">
-          <div className="rounded-2xl bg-gradient-to-br from-purple-600 to-violet-700 p-5 text-white shadow-lg shadow-purple-200">
-            <p className="text-[10px] font-bold tracking-widest uppercase text-purple-200 mb-3">About</p>
-            <p className="text-xs leading-relaxed text-white/85 mb-4">
-              Ask Nepali legal questions using HyDE RAG for faster answers, or switch to Agent mode for deeper tool-based research.
-            </p>
-            <div className="space-y-2 text-[11px] text-purple-200">
-              {[
-                'HyDE: SLM generates a hypothetical passage',
-                'HyDE: FAISS retrieves relevant legal chunks',
-                'Agent: uses MCP tools for deeper retrieval',
-              ].map((s, i) => (
-                <div key={i} className="flex items-start gap-2">
-                  <span className="mt-px w-4 h-4 rounded bg-white/15 text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0">
-                    {i + 1}
-                  </span>
-                  <span className="leading-tight">{s}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="rounded-2xl bg-white border border-purple-100 p-4 shadow-sm">
-            <p className="text-[10px] font-bold tracking-widest uppercase text-gray-300 mb-3">Try These</p>
-            <div className="space-y-0.5">
-              {SAMPLES.map(q => (
-                <button
-                  key={q}
-                  onClick={() => { setQuestion(q); textareaRef.current?.focus() }}
-                  disabled={loading}
-                  className="w-full text-left text-[12px] text-gray-500 px-2.5 py-2 rounded-lg hover:bg-purple-50 hover:text-purple-700 transition-colors disabled:opacity-40 leading-snug"
+      {/* Scrollable response area */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 py-6">
+          {/* Empty state */}
+          {!loading && !result && !error && (
+            <div className="flex flex-col items-center justify-center py-24 px-8 text-center">
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
+                style={{ background: '#F5F0E6' }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8B7355" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1L3 5v6c0 5.25 3.75 10.15 9 11.35C17.25 21.15 21 16.25 21 11V5L12 1z" />
+                </svg>
+              </div>
+              <p
+                className="text-base font-semibold mb-2"
+                style={{ color: '#1a1208' }}
+              >
+                नेपाली कानूनी सहायक
+              </p>
+              <p
+                className="text-sm max-w-md leading-relaxed mb-8"
+                style={{ color: '#5A5245', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", fontWeight: 500 }}
+              >
+                Ask any question about Nepal's laws and Constitution. Get instant answers grounded in legal sources with full citations.
+              </p>
+              
+              {/* Sample questions */}
+              <div className="w-full max-w-lg">
+                <p
+                  className="text-[10px] font-bold tracking-widest uppercase mb-3"
+                  style={{ color: '#8B7355' }}
                 >
-                  {q}
-                </button>
-              ))}
-            </div>
-          </div>
-          {history.length > 0 && (
-            <div className="rounded-2xl bg-white border border-purple-100 p-4 shadow-sm">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-gray-300 mb-3">Recent</p>
-              <div className="space-y-0.5">
-                {history.map((h, i) => (
-                  <button
-                    key={i}
-                    onClick={() => { setQuestion(h.question); textareaRef.current?.focus() }}
-                    disabled={loading}
-                    className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-purple-50 transition-colors disabled:opacity-40 group"
-                  >
-                    <p className="text-[12px] text-gray-500 group-hover:text-purple-600 truncate leading-snug">{h.question}</p>
-                    <p className="text-[10px] text-gray-300 mt-0.5">{h.time}</p>
-                  </button>
-                ))}
+                  Try These Questions
+                </p>
+                <div className="grid gap-2">
+                  {SAMPLES.map(q => (
+                    <button
+                      key={q}
+                      onClick={() => { setQuestion(q); textareaRef.current?.focus() }}
+                      disabled={loading}
+                      className="w-full text-left text-[13px] px-4 py-3 rounded-lg transition-all disabled:opacity-40 leading-snug shadow-sm"
+                      style={{
+                        color: '#1a1208',
+                        background: '#F5F0E6',
+                        border: '1px solid #C4BAA8',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = '#D6CDB8'
+                        e.target.style.borderColor = '#8B7355'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = '#F5F0E6'
+                        e.target.style.borderColor = '#C4BAA8'
+                      }}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
-        </aside>
 
-        <main className="space-y-4 min-w-0">
-          <div className="bg-white rounded-2xl border border-purple-100 shadow-sm overflow-hidden">
-            <div className="px-5 pt-5 pb-3">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-gray-300 mb-3">Your Question</p>
-              <textarea
-                ref={textareaRef}
-                rows={1}
-                value={question}
-                onChange={e => setQuestion(e.target.value)}
-                onKeyDown={handleKey}
-                disabled={loading}
-                placeholder="नेपाली वा अंग्रेजीमा प्रश्न सोध्नुहोस्... (Ask in Nepali or English)"
-                className="w-full resize-none text-sm text-gray-800 placeholder-gray-500 bg-transparent outline-none leading-relaxed disabled:opacity-50"
-                style={{ minHeight: '44px', maxHeight: '160px', overflowY: 'auto' }}
-              />
-            </div>
-            <div className="px-4 pb-4 pt-2 border-t border-purple-50 flex items-center justify-between gap-3">
-              <p className="text-[11px] text-gray-300 hidden sm:block">
-                <kbd className="font-mono bg-gray-100 text-gray-400 px-1 py-px rounded text-[10px]">Enter</kbd> to send
-              </p>
-              <button
-                onClick={() => handleSubmit()}
-                disabled={loading || !question.trim()}
-                className="ml-auto flex items-center gap-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:bg-purple-200 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed select-none"
-              >
-                {loading
-                  ? <><Spinner /><span>Processing...</span></>
-                  : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg><span>Ask</span></>
-                }
-              </button>
-            </div>
-          </div>
-
+          {/* Error */}
           {error && (
-            <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
+            <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
               <svg className="text-red-400 flex-shrink-0 mt-0.5" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                 <line x1="12" y1="9" x2="12" y2="13" />
@@ -431,17 +389,25 @@ export function Chat({ user, onLogout }) {
             </div>
           )}
 
+          {/* Loading */}
           {loading && <LoadingView phase={phase} mode={mode} />}
 
+          {/* Results */}
           {result && !loading && (
-            <div ref={resultsRef} className="space-y-3" style={{ animation: 'fadeUp 0.35s ease' }}>
-              <div className="flex items-center justify-between px-1 py-1">
-                <p className="text-xs font-semibold text-gray-700">
-                  Results
-                  <span className="font-normal text-gray-400 ml-2 italic">"{result.question.slice(0, 60)}{result.question.length > 60 ? '...' : ''}"</span>
-                </p>
-                <span className="text-[11px] text-gray-400 font-mono flex-shrink-0">{result.processing_time}s</span>
+            <div className="space-y-3" style={{ animation: 'fadeUp 0.35s ease' }}>
+              {/* Question echo */}
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{result.question}</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Mode: {result.mode} · {result.processing_time}s</p>
+                </div>
               </div>
+
               {result.mode === 'hyde' && result.hyde_passage && (
                 <HydeCard passage={result.hyde_passage} />
               )}
@@ -469,7 +435,6 @@ export function Chat({ user, onLogout }) {
                 </button>
               </div>
 
-
               <AnswerCard
                 title={result.mode === 'agent' ? 'Agent' : 'HyDE'}
                 label={result.mode === 'agent' ? 'Tool-based research mode' : 'HyDE RAG answer'}
@@ -483,53 +448,95 @@ export function Chat({ user, onLogout }) {
               />
             </div>
           )}
-
-          {!loading && !result && !error && (
-            <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center mb-4">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 1L3 5v6c0 5.25 3.75 10.15 9 11.35C17.25 21.15 21 16.25 21 11V5L12 1z" />
-                </svg>
-              </div>
-              <p className="text-sm font-semibold text-gray-600 mb-1">Ask with HyDE or Agent mode</p>
-              <p className="text-xs text-gray-400 max-w-xs leading-relaxed">
-                Use HyDE for quick answers, or switch to Agent for deeper questions.
-              </p>
-            </div>
-          )}
-        </main>
+        </div>
       </div>
 
-      <footer className="border-t border-purple-100 bg-white">
-        <div className="max-w-5xl mx-auto px-5 h-10 flex items-center justify-between">
-          <span className="text-[11px] text-gray-500">Dipsan99 · HyDE + Agent · Qwen2.5 + LaBSE + FAISS</span>
-          <div className="flex items-center gap-4">
-            <a
-              href="https://huggingface.co/zeri000/nepali_legal_qwen_merged_4"
-              target="_blank"
-              rel="noreferrer"
-              className="text-[11px] text-gray-500 hover:text-purple-600 transition-colors"
-            >
-              HyDE SLM
-            </a>
-            <a
-              href="https://huggingface.co/datasets/zeri000/augmented_nepali_legal_qa.csv"
-              target="_blank"
-              rel="noreferrer"
-              className="text-[11px] text-gray-500 hover:text-purple-600 transition-colors"
-            >
-              Dataset
-            </a>
+      {/* Input area pinned at bottom — Perplexity-style card */}
+      <div
+        className="px-4 sm:px-6 pb-4 pt-2"
+        style={{ background: '#EDE8DC' }}
+      >
+        <div className="max-w-4xl mx-auto w-full">
+          <div
+            className="rounded-2xl border shadow-lg overflow-hidden"
+            style={{
+              background: '#F5F0E6',
+              borderColor: '#C4BAA8',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+            }}
+          >
+            {/* Textarea */}
+            <div className="px-5 pt-4 pb-2">
+              <textarea
+                ref={textareaRef}
+                rows={1}
+                value={question}
+                onChange={e => setQuestion(e.target.value)}
+                onKeyDown={handleKey}
+                disabled={loading}
+                placeholder="नेपाली वा अंग्रेजीमा प्रश्न सोध्नुहोस्... (Ask in Nepali or English)"
+                className="w-full resize-none text-[15px] placeholder-gray-400 bg-transparent outline-none leading-relaxed disabled:opacity-50"
+                style={{
+                  minHeight: '28px',
+                  maxHeight: '120px',
+                  overflowY: 'auto',
+                  color: '#1a1208',
+                }}
+              />
+            </div>
+
+            {/* Toolbar row */}
+            <div className="px-4 pb-3 pt-1 flex items-center justify-between">
+              {/* Left — Mode dropdown */}
+              <div className="flex items-center gap-2">
+                <select
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value)}
+                  disabled={loading}
+                  className="h-8 px-3 pr-7 text-[12px] font-semibold rounded-lg outline-none cursor-pointer disabled:opacity-50 transition-colors"
+                  style={{
+                    color: '#1a1208',
+                    background: '#D6CDB8',
+                    borderColor: '#8B7355',
+                    border: '1px solid #8B7355',
+                  }}
+                >
+                  <option value="hyde">⚡ HyDE (fast)</option>
+                  <option value="agent">🤖 Agent (deep)</option>
+                </select>
+              </div>
+
+              {/* Right — Send button */}
+              <button
+                onClick={() => handleSubmit()}
+                disabled={loading || !question.trim()}
+                className="flex items-center justify-center w-9 h-9 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:bg-purple-200 text-white rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed"
+              >
+                {loading
+                  ? <Spinner />
+                  : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+                }
+              </button>
+            </div>
           </div>
+
+          <p className="text-[10px] text-gray-300 mt-2 text-center">
+            <kbd className="font-mono bg-gray-100 text-gray-400 px-1 py-px rounded text-[10px]">Enter</kbd> to send · <kbd className="font-mono bg-gray-100 text-gray-400 px-1 py-px rounded text-[10px]">Shift+Enter</kbd> new line
+          </p>
         </div>
-      </footer>
+      </div>
 
       <style>{`
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(10px); }
           to   { opacity: 1; transform: translateY(0); }
         }
+        /* Hide scrollbar but keep scrollable */
+        div::-webkit-scrollbar {
+          display: none;
+        }
       `}</style>
     </div>
   )
 }
+

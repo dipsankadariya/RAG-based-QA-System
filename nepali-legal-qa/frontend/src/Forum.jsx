@@ -10,6 +10,7 @@ import {
   Send,
 } from 'lucide-react'
 
+import { Navbar } from './Navbar'
 import { UserProfile } from './GoogleLogin'
 
 const API_BASE = (import.meta.env.VITE_FORUM_API_BASE ?? '').replace(/\/$/, '')
@@ -113,6 +114,7 @@ async function forumRequest(path, options = {}) {
   const res = await fetch(`${FORUM_BASE}${path}`, {
     ...options,
     headers,
+    credentials: 'include',
   })
 
   if (!res.ok) {
@@ -350,92 +352,12 @@ export function Forum({ user, onLogout }) {
     <div
       style={{
         minHeight: '100vh',
-        background: '#fff',
-        fontFamily: "'Inter', 'Helvetica Neue', sans-serif",
+        background: '#EDE8DC',
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
       }}
     >
-      {/* Header */}
-      <header
-        style={{
-          borderBottom: '1px solid #e5e7eb',
-          background: '#fff',
-          position: 'sticky',
-          top: 0,
-          zIndex: 20,
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 1180,
-            margin: '0 auto',
-            padding: '0 24px',
-            height: 52,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 9,
-            }}
-          >
-            <div
-              style={{
-                width: 27,
-                height: 27,
-                borderRadius: 6,
-                background: '#6d28d9',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Scale size={13} color="#fff" />
-            </div>
-
-            <span
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: '#111827',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              Legal Forum
-            </span>
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-            }}
-          >
-            <Link
-              to="/chat"
-              style={{
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: '#6d28d9',
-                border: '1px solid #6d28d9',
-                borderRadius: 6,
-                padding: '5px 14px',
-                textDecoration: 'none',
-              }}
-            >
-              Ask AI
-            </Link>
-
-            {user && (
-              <UserProfile user={user} onLogout={onLogout} />
-            )}
-          </div>
-        </div>
-      </header>
+      {/* Shared Navbar */}
+      <Navbar user={user} onLogout={onLogout} />
 
       {/* Body */}
       <div
@@ -450,13 +372,13 @@ export function Forum({ user, onLogout }) {
         {/* Threads */}
         <section
           style={{
-            borderRight: '1px solid #e5e7eb',
+            borderRight: '1px solid #C4BAA8',
           }}
         >
           <div
             style={{
               padding: '15px 0 13px',
-              borderBottom: '1px solid #e5e7eb',
+              borderBottom: '1px solid #C4BAA8',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -643,7 +565,7 @@ export function Forum({ user, onLogout }) {
                       style={{
                         margin: '0 0 8px',
                         fontSize: 13,
-                        color: '#6b7280',
+                        color: '#5A5245',
                         lineHeight: 1.55,
                       }}
                     >
@@ -676,8 +598,8 @@ export function Forum({ user, onLogout }) {
                         fontWeight: 500,
                         color:
                           voted === 1
-                            ? '#6d28d9'
-                            : '#9ca3af',
+                            ? '#8B7355'
+                            : '#5A5245',
                       }}
                     >
                       <ChevronUp size={14} />
@@ -700,8 +622,8 @@ export function Forum({ user, onLogout }) {
                         fontWeight: 500,
                         color:
                           voted === -1
-                            ? '#dc2626'
-                            : '#9ca3af',
+                            ? '#DC2626'
+                            : '#5A5245',
                       }}
                     >
                       <ChevronDown size={14} />
@@ -714,7 +636,7 @@ export function Forum({ user, onLogout }) {
                         alignItems: 'center',
                         gap: 3,
                         fontSize: 12.5,
-                        color: '#9ca3af',
+                        color: '#5A5245',
                       }}
                     >
                       <Eye size={13} />
@@ -728,7 +650,7 @@ export function Forum({ user, onLogout }) {
                         alignItems: 'center',
                         gap: 3,
                         fontSize: 12.5,
-                        color: '#9ca3af',
+                        color: '#5A5245',
                         textDecoration: 'none',
                       }}
                     >
@@ -745,13 +667,15 @@ export function Forum({ user, onLogout }) {
         {/* Sidebar */}
         <aside
           style={{
-            paddingLeft: 24,
+            paddingLeft: 0,
+            paddingRight: 0,
             paddingTop: 15,
             position: 'sticky',
             top: 52,
             alignSelf: 'start',
             height: 'calc(100vh - 52px)',
             overflowY: 'auto',
+            width: '100%',
           }}
         >
           <p
@@ -759,10 +683,12 @@ export function Forum({ user, onLogout }) {
               margin: '0 0 14px',
               fontSize: 13,
               fontWeight: 600,
-              color: '#374151',
+              color: '#1a1208',
+              paddingLeft: 20,
+              paddingRight: 20,
             }}
           >
-            New thread
+            New Question
           </p>
 
           <form
@@ -770,7 +696,9 @@ export function Forum({ user, onLogout }) {
             style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: 10,
+              gap: 12,
+              paddingLeft: 20,
+              paddingRight: 20,
             }}
           >
             <input
@@ -780,12 +708,14 @@ export function Forum({ user, onLogout }) {
               placeholder="Title"
               required
               style={{
-                height: 36,
+                height: 48,
                 borderRadius: 6,
-                border: '1px solid #e5e7eb',
-                padding: '0 10px',
-                fontSize: 13,
-                background: '#f9fafb',
+                border: '1px solid #C4BAA8',
+                padding: '0 12px',
+                fontSize: 14,
+                background: '#FFFFFF',
+                color: '#1a1208',
+                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
               }}
             />
 
@@ -793,30 +723,34 @@ export function Forum({ user, onLogout }) {
               type="text"
               value={role}
               onChange={e => setRole(e.target.value)}
-              placeholder="Role (e.g., Student, Advocate, Intern)"
+              placeholder="Role (e.g., Student, Advocate)"
               style={{
-                height: 36,
+                height: 48,
                 borderRadius: 6,
-                border: '1px solid #e5e7eb',
-                padding: '0 10px',
-                fontSize: 13,
-                background: '#f9fafb',
+                border: '1px solid #C4BAA8',
+                padding: '0 12px',
+                fontSize: 14,
+                background: '#FFFFFF',
+                color: '#1a1208',
+                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
               }}
             />
 
             <textarea
               value={detail}
               onChange={e => setDetail(e.target.value)}
-              rows={6}
-              placeholder="What's your question? Add context..."
+              rows={9}
+              placeholder="Describe your legal question..."
               style={{
                 borderRadius: 6,
-                border: '1px solid #e5e7eb',
-                padding: '9px 10px',
-                fontSize: 13,
-                background: '#f9fafb',
+                border: '1px solid #C4BAA8',
+                padding: '12px 12px',
+                fontSize: 14,
+                background: '#FFFFFF',
+                color: '#1a1208',
                 resize: 'none',
-                lineHeight: 1.55,
+                lineHeight: 1.5,
+                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
               }}
             />
 
@@ -825,7 +759,10 @@ export function Forum({ user, onLogout }) {
                 style={{
                   margin: 0,
                   fontSize: 12,
-                  color: '#dc2626',
+                  color: '#DC2626',
+                  background: '#FEE2E2',
+                  padding: '8px 10px',
+                  borderRadius: 6,
                 }}
               >
                 {postError}
@@ -839,62 +776,31 @@ export function Forum({ user, onLogout }) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 6,
-                padding: '9px 0',
+                gap: 8,
+                padding: '14px 0',
                 borderRadius: 6,
-                background: '#6d28d9',
-                color: '#fff',
-                fontSize: 13,
+                background: '#8B7355',
+                color: '#FFFFFF',
+                fontSize: 14,
                 fontWeight: 600,
                 border: 'none',
-                cursor: 'pointer',
+                cursor: posting ? 'not-allowed' : 'pointer',
+                opacity: posting ? 0.7 : 1,
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                if (!posting) e.target.style.background = '#6B563D'
+              }}
+              onMouseLeave={(e) => {
+                if (!posting) e.target.style.background = '#8B7355'
               }}
             >
-              <Send size={13} />
-
-              {posting ? 'Posting...' : 'Post'}
+              <Send size={16} />
+              {posting ? 'Posting...' : 'Post Question'}
             </button>
           </form>
 
-          <div
-            style={{
-              marginTop: 20,
-              paddingTop: 16,
-              borderTop: '1px solid #f3f4f6',
-            }}
-          >
-            <p
-              style={{
-                margin: '0 0 8px',
-                fontSize: 11,
-                fontWeight: 600,
-                color: '#9ca3af',
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-              }}
-            >
-              Tips
-            </p>
 
-            {[
-              'Be specific',
-              'Add context',
-              'Search first',
-              'Stay on topic',
-            ].map(tip => (
-              <p
-                key={tip}
-                style={{
-                  margin: '0 0 5px',
-                  fontSize: 12,
-                  color: '#6b7280',
-                  lineHeight: 1.4,
-                }}
-              >
-                · {tip}
-              </p>
-            ))}
-          </div>
         </aside>
       </div>
     </div>
