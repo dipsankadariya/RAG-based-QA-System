@@ -1,25 +1,46 @@
 import logging
 import os
 import time
-from typing import Optional
+from typing import Literal, Optional
 
-import torch
+from dotenv import load_dotenv
+
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
-from langchain_community.document_loaders import TextLoader
-from langchain_community.vectorstores import FAISS
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_groq import ChatGroq
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import BaseModel
-from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# HyDE/RAG dependencies are optional so Agent mode can run even when
+# torch/transformers wheels are unavailable (e.g., Python 3.14 on Windows).
+HYDE_DEPS_ERROR: Optional[str] = None
+try:
+    import torch
+    from langchain_community.document_loaders import TextLoader
+    from langchain_community.vectorstores import FAISS
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_groq import ChatGroq
+    from langchain_huggingface import HuggingFaceEmbeddings
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+except Exception as exc:
+    torch = None
+    TextLoader = None
+    FAISS = None
+    ChatPromptTemplate = None
+    ChatGroq = None
+    HuggingFaceEmbeddings = None
+    RecursiveCharacterTextSplitter = None
+    AutoModelForCausalLM = None
+    AutoTokenizer = None
+    HYDE_DEPS_ERROR = str(exc)
 
 from auth import Token, TokenData, create_access_token, verify_access_token, verify_google_token
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
+
+# Load local env vars if a .env exists (keeps running simple on Windows).
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"), override=False)
 
 
 MODEL_ID = os.getenv("MODEL_ID", "zeri000/nepali_legal_qwen_merged_4")
@@ -31,10 +52,15 @@ GROQ_KEYS = [
     os.getenv("GROQ_API_KEY_4"),
 ]
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cpu"
+if torch is not None:
+    try:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    except Exception:
+        device = "cpu"
 
 
-app = FastAPI(title="Nepali Legal QA - HyDE vs Baseline RAG", version="5.0.0")
+app = FastAPI(title="Nepali Legal QA", version="6.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -57,17 +83,16 @@ request_counter = [0]
 class QueryRequest(BaseModel):
     question: str
     top_k: Optional[int] = 3
+    mode: Literal["hyde", "agent"] = "hyde"
 
 
 class QueryResponse(BaseModel):
     question: str
-    hyde_passage: str
-    baseline_retrieved_docs: list[str]
-    hyde_retrieved_docs: list[str]
-    baseline_answer: str
-    hyde_answer: str
-    baseline_answer_in_english: str  
-    hyde_answer_in_english: str
+    mode: Literal["hyde", "agent"]
+    answer: str
+    answer_in_english: Optional[str] = None
+    hyde_passage: Optional[str] = None
+    retrieved_docs: Optional[list[str]] = None
     processing_time: float
 
 
@@ -166,6 +191,15 @@ def generate_english_answer(question:str,answer:str,generator)->str:
 def load_models():
     global tokenizer, model, vector_store, generators, terminators, answer_generators, english_answer_generators
 
+    if HYDE_DEPS_ERROR:
+        log.warning("HyDE mode disabled (missing dependencies): %s", HYDE_DEPS_ERROR)
+        return
+
+    active_keys = [key for key in GROQ_KEYS if key]
+    if not active_keys:
+        log.warning("HyDE mode disabled: set GROQ_API_KEY (or GROQ_API_KEY_2/3/4) to enable answering")
+        return
+
     log.info("Device: %s", device)
 
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
@@ -192,10 +226,6 @@ def load_models():
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/LaBSE")
     vector_store = FAISS.from_documents(chunks, embeddings)
     log.info("Built FAISS store with %d chunks", len(chunks))
-
-    active_keys = [key for key in GROQ_KEYS if key]
-    if not active_keys:
-        raise RuntimeError("At least one GROQ_API_KEY environment variable is required.")
 
     system_prompt = """
 You are a Nepali legal question-answering assistant.
@@ -283,18 +313,49 @@ Output only the English answer — no commentary, no preamble.
         answer_prompt_3 | ChatGroq(model="openai/gpt-oss-120b", api_key=key)
         for key in active_keys
     ]
+
+
+@app.on_event("startup")
+async def load_agent():
+    # Optional agent mode: keep HyDE working even if agent deps/keys are missing.
+    try:
+        from mcp_agent import get_agent_status, init_agent
+        await init_agent()
+        status = get_agent_status()
+        if status.ready:
+            log.info("Agent mode ready")
+        else:
+            log.warning("Agent mode disabled: %s", status.error)
+    except Exception as exc:
+        log.warning("Agent startup failed (HyDE still available): %s", exc)
     
     
 
 
 @app.get("/api/health")
 def health():
+    agent_ready = False
+    agent_error = None
+    try:
+        from mcp_agent import get_agent_status
+
+        st = get_agent_status()
+        agent_ready = st.ready
+        agent_error = st.error
+    except Exception:
+        agent_ready = False
+        agent_error = "Agent module unavailable"
+
     return {
         "status": "ok",
         "model": MODEL_ID,
         "device": device,
+        "hyde_ready": (model is not None and vector_store is not None and bool(generators) and bool(answer_generators)),
+        "hyde_error": HYDE_DEPS_ERROR,
         "has_vector_store": vector_store is not None,
         "has_llm": bool(generators),
+        "agent_ready": agent_ready,
+        "agent_error": agent_error,
     }
 
 
@@ -363,10 +424,7 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> TokenData:
 
 
 @app.post("/api/query", response_model=QueryResponse)
-def query(req: QueryRequest, authorization: Optional[str] = Header(None)):
-    if model is None or vector_store is None or not generators:
-        raise HTTPException(status_code=503, detail="Pipeline not ready yet")
-
+async def query(req: QueryRequest, authorization: Optional[str] = Header(None)):
     question = req.question.strip()
     if not question:
         raise HTTPException(status_code=400, detail="Question is required")
@@ -374,50 +432,77 @@ def query(req: QueryRequest, authorization: Optional[str] = Header(None)):
     top_k = max(1, min(req.top_k or 3, 8))
     t0 = time.perf_counter()
 
-    hyde_passage = generate_hyde_document(question)
+    mode = req.mode
 
-    baseline_docs = retrieve_with_baseline(question, top_k)
-    hyde_docs = retrieve_with_hyde(hyde_passage, top_k)
+    if mode == "agent":
+        try:
+            from mcp_agent import run_agent
 
-    if not baseline_docs or not hyde_docs:
-        raise HTTPException(status_code=500, detail="Document retrieval failed")
-    
-    idx=request_counter[0] % len(generators)
+            answer = await run_agent(question)
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
+
+        answer_in_english = None
+        if english_answer_generators:
+            idx = request_counter[0] % len(english_answer_generators)
+            request_counter[0] += 1
+            try:
+                answer_in_english = generate_english_answer(
+                    question,
+                    answer,
+                    english_answer_generators[idx],
+                )
+            except Exception:
+                answer_in_english = None
+
+        return QueryResponse(
+            question=question,
+            mode="agent",
+            answer=answer,
+            answer_in_english=answer_in_english,
+            hyde_passage=None,
+            retrieved_docs=None,
+            processing_time=round(time.perf_counter() - t0, 2),
+        )
+
+    # Default: HyDE mode
+    if HYDE_DEPS_ERROR:
+        raise HTTPException(status_code=503, detail=f"HyDE dependencies not installed: {HYDE_DEPS_ERROR}")
+    if model is None or vector_store is None or not generators or not answer_generators:
+        raise HTTPException(status_code=503, detail="HyDE pipeline not ready yet")
+    if not english_answer_generators:
+        raise HTTPException(status_code=503, detail="English generator not ready yet")
+
+    idx = request_counter[0] % len(generators)
     request_counter[0] += 1
-    current_answer_generator=answer_generators[idx]
-    current_generator=generators[idx]
-    current_english_answer_generator=english_answer_generators[idx]
+    current_answer_generator = answer_generators[idx]
+    current_generator = generators[idx]
+    current_english_answer_generator = english_answer_generators[idx]
 
-    
-
-    try:
-        baseline_answer = generate_answer_from_docs(question, baseline_docs, current_answer_generator)
-    except Exception as exc:
-        log.exception("Baseline answer generation failed")
-        baseline_answer = f"Baseline answer error: {exc}"
+    hyde_passage = generate_hyde_document(question)
+    hyde_docs = retrieve_with_hyde(hyde_passage, top_k)
+    if not hyde_docs:
+        raise HTTPException(status_code=500, detail="Document retrieval failed")
 
     try:
-        base_answer = generate_answer_from_docs(question, hyde_docs, current_answer_generator)
-        hyde_answer=generate_hyde_answer_final(question,base_answer,current_generator)
+        draft = generate_answer_from_docs(question, hyde_docs, current_answer_generator)
+        answer = generate_hyde_answer_final(question, draft, current_generator)
     except Exception as exc:
         log.exception("HyDE answer generation failed")
-        hyde_answer = f"HyDE answer error: {exc}"
-        
+        answer = f"HyDE answer error: {exc}"
+
+    answer_in_english = None
     try:
-        baseline_answer_in_english=generate_english_answer(question,baseline_answer,current_english_answer_generator)
-        hyde_answer_in_english=generate_english_answer(question,hyde_answer,current_english_answer_generator)
-    except Exception as exc:
-        log.exception("English answer generation failed")
-        hyde_answer_in_english=f"Error for english answer generator:{exc}"
+        answer_in_english = generate_english_answer(question, answer, current_english_answer_generator)
+    except Exception:
+        answer_in_english = None
 
     return QueryResponse(
         question=question,
+        mode="hyde",
+        answer=answer,
+        answer_in_english=answer_in_english,
         hyde_passage=hyde_passage,
-        baseline_retrieved_docs=[doc.page_content for doc in baseline_docs],
-        hyde_retrieved_docs=[doc.page_content for doc in hyde_docs],
-        baseline_answer=baseline_answer,
-        hyde_answer=hyde_answer,
-        baseline_answer_in_english=baseline_answer_in_english,
-        hyde_answer_in_english=hyde_answer_in_english,
+        retrieved_docs=[doc.page_content for doc in hyde_docs],
         processing_time=round(time.perf_counter() - t0, 2),
     )

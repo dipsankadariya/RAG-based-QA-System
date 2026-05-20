@@ -20,7 +20,30 @@ async function queryLegal(question, topK = 5) {
   const res = await fetch(endpoint, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ question, top_k: topK }),
+    body: JSON.stringify({ question, top_k: topK, mode: 'hyde' }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+async function queryLegalWithMode(question, topK, mode) {
+  const endpoint = API_BASE ? `${API_BASE}/api/query` : '/api/query'
+  const token = localStorage.getItem('auth_token')
+  const headers = {
+    'Content-Type': 'application/json',
+  }
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ question, top_k: topK, mode }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
@@ -161,29 +184,7 @@ function AnswerCard({ title, label, answer, bgGradient, icon }) {
   )
 }
 
-function ComparisonCard({ baselineAnswer, hydeAnswer, baselineEnglish, hydeEnglish, showEnglish }) {
-  const displayBaseline = showEnglish && baselineEnglish ? baselineEnglish : baselineAnswer;
-  const displayHyde = showEnglish && hydeEnglish ? hydeEnglish : hydeAnswer;
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch">
-      <AnswerCard
-        title="Baseline"
-        label="Standard RAG retrieval"
-        answer={displayBaseline}
-        icon={<path d="M12 1L3 5v6c0 5.25 3.75 10.15 9 11.35C17.25 21.15 21 16.25 21 11V5L12 1z" />}
-        bgGradient="bg-gradient-to-r from-orange-600 to-amber-600"
-      />
-      <AnswerCard
-        title="HyDE"
-        label="SLM-generated HyDE retrieval"
-        answer={displayHyde}
-        icon={<path d="M12 2l2.4 7.6H22l-6.2 4.5 2.4 7.5L12 17.1l-6.2 4.5 2.4-7.5L2 9.6h7.6z" />}
-        bgGradient="bg-gradient-to-r from-purple-600 to-violet-600"
-      />
-    </div>
-  )
-}
+ 
 
 function PipelineStep({ num, label, status }) {
   const ring = {
@@ -204,7 +205,7 @@ function PipelineStep({ num, label, status }) {
   )
 }
 
-function LoadingView({ phase }) {
+function LoadingView({ phase, mode }) {
   const idx = ['hyde', 'retrieve', 'answer'].indexOf(phase)
   const st = (i) => i < idx ? 'done' : i === idx ? 'active' : 'waiting'
   const line = (active) => (
@@ -216,13 +217,17 @@ function LoadingView({ phase }) {
     <div className="bg-white rounded-2xl border border-purple-100 px-8 py-10 text-center shadow-sm">
       <div className="flex justify-center mb-5"><Spinner size="lg" /></div>
       <p className="text-sm font-semibold text-gray-700 mb-1">Processing your query</p>
-      <p className="text-xs text-gray-400 mb-8">Comparing baseline retrieval with HyDE-enhanced retrieval</p>
+      <p className="text-xs text-gray-400 mb-8">
+        {mode === 'agent'
+          ? 'Agent mode: uses tools for deeper research'
+          : 'HyDE mode: generates a HyDE passage, retrieves docs, and answers'}
+      </p>
       <div className="flex items-start gap-2 max-w-sm mx-auto">
-        <PipelineStep num="1" label="Generate HyDE" status={st(0)} />
+        <PipelineStep num="1" label={mode === 'agent' ? 'Plan' : 'Generate HyDE'} status={st(0)} />
         {line(idx >= 1)}
-        <PipelineStep num="2" label="Retrieve docs" status={st(1)} />
+        <PipelineStep num="2" label={mode === 'agent' ? 'Use tools' : 'Retrieve docs'} status={st(1)} />
         {line(idx >= 2)}
-        <PipelineStep num="3" label="Compare answers" status={st(2)} />
+        <PipelineStep num="3" label="Answer" status={st(2)} />
       </div>
     </div>
   )
@@ -230,6 +235,7 @@ function LoadingView({ phase }) {
 
 export function Chat({ user, onLogout }) {
   const [question, setQuestion] = useState('')
+  const [mode, setMode] = useState('hyde')
   const [loading, setLoading] = useState(false)
   const [phase, setPhase] = useState('hyde')
   const [result, setResult] = useState(null)
@@ -260,7 +266,7 @@ export function Chat({ user, onLogout }) {
     const t1 = setTimeout(() => setPhase('retrieve'), 3000)
     const t2 = setTimeout(() => setPhase('answer'), 7000)
     try {
-      const data = await queryLegal(trimmed)
+      const data = await queryLegalWithMode(trimmed, 5, mode)
       setResult(data)
       clearTimeout(t1)
       clearTimeout(t2)
@@ -273,7 +279,7 @@ export function Chat({ user, onLogout }) {
     } finally {
       setLoading(false)
     }
-  }, [question, loading])
+  }, [question, loading, mode])
 
   const handleKey = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -293,13 +299,22 @@ export function Chat({ user, onLogout }) {
               </svg>
             </div>
             <span className="text-sm font-semibold text-gray-900">नेपाली कानूनी सहायक</span>
-            <span className="hidden sm:block text-xs text-gray-300">/ Baseline vs HyDE RAG</span>
+            <span className="hidden sm:block text-xs text-gray-300">/ HyDE + Agent</span>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5 text-[11px] text-purple-500 font-medium bg-purple-50 border border-purple-100 rounded-full px-3 py-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span className="hidden sm:block">Baseline RAG • HyDE RAG • FAISS</span>
-            </div>
+              <div className="flex items-center gap-2 text-[11px] text-purple-600 font-medium bg-purple-50 border border-purple-100 rounded-full px-3 py-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span className="hidden sm:block">Mode</span>
+                <select
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value)}
+                  disabled={loading}
+                  className="bg-transparent outline-none text-[11px] font-semibold text-purple-700 disabled:opacity-50 cursor-pointer"
+                >
+                  <option value="hyde">HyDE (fast)</option>
+                  <option value="agent">Agent (deep)</option>
+                </select>
+              </div>
             <Link
               to="/forum"
               className="hidden md:inline-flex items-center px-3 py-1.5 text-[11px] font-semibold rounded-full border border-purple-200 text-purple-700 hover:bg-purple-50 transition-colors"
@@ -316,13 +331,13 @@ export function Chat({ user, onLogout }) {
           <div className="rounded-2xl bg-gradient-to-br from-purple-600 to-violet-700 p-5 text-white shadow-lg shadow-purple-200">
             <p className="text-[10px] font-bold tracking-widest uppercase text-purple-200 mb-3">About</p>
             <p className="text-xs leading-relaxed text-white/85 mb-4">
-              This project compares standard RAG retrieval against HyDE-enhanced retrieval for Nepali legal QA in a low-resource setting.
+              Ask Nepali legal questions using HyDE RAG for faster answers, or switch to Agent mode for deeper tool-based research.
             </p>
             <div className="space-y-2 text-[11px] text-purple-200">
               {[
-                'Fine-tuned SLM generates a hypothetical legal passage',
-                'Baseline and HyDE retrieve legal passages from FAISS',
-                'The same answer model responds on both retrieved contexts',
+                'HyDE: SLM generates a hypothetical passage',
+                'HyDE: FAISS retrieves relevant legal chunks',
+                'Agent: uses MCP tools for deeper retrieval',
               ].map((s, i) => (
                 <div key={i} className="flex items-start gap-2">
                   <span className="mt-px w-4 h-4 rounded bg-white/15 text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0">
@@ -416,7 +431,7 @@ export function Chat({ user, onLogout }) {
             </div>
           )}
 
-          {loading && <LoadingView phase={phase} />}
+          {loading && <LoadingView phase={phase} mode={mode} />}
 
           {result && !loading && (
             <div ref={resultsRef} className="space-y-3" style={{ animation: 'fadeUp 0.35s ease' }}>
@@ -427,19 +442,18 @@ export function Chat({ user, onLogout }) {
                 </p>
                 <span className="text-[11px] text-gray-400 font-mono flex-shrink-0">{result.processing_time}s</span>
               </div>
-              <HydeCard passage={result.hyde_passage} />
-              <DocsCard
-                docs={result.baseline_retrieved_docs}
-                badge="baseline"
-                badgeClass="bg-orange-50 text-orange-600 border-orange-100"
-                label={`${result.baseline_retrieved_docs.length} passages retrieved by baseline RAG`}
-              />
-              <DocsCard
-                docs={result.hyde_retrieved_docs}
-                badge="hyde ctx"
-                badgeClass="bg-emerald-50 text-emerald-600 border-emerald-100"
-                label={`${result.hyde_retrieved_docs.length} passages retrieved by HyDE-enhanced RAG`}
-              />
+              {result.mode === 'hyde' && result.hyde_passage && (
+                <HydeCard passage={result.hyde_passage} />
+              )}
+
+              {result.mode === 'hyde' && Array.isArray(result.retrieved_docs) && (
+                <DocsCard
+                  docs={result.retrieved_docs}
+                  badge="hyde ctx"
+                  badgeClass="bg-emerald-50 text-emerald-600 border-emerald-100"
+                  label={`${result.retrieved_docs.length} passages retrieved by HyDE RAG`}
+                />
+              )}
               
               <div className="flex items-center justify-end mt-4 mb-2 pr-1">
                 <button
@@ -455,12 +469,17 @@ export function Chat({ user, onLogout }) {
                 </button>
               </div>
 
-              <ComparisonCard 
-                baselineAnswer={result.baseline_answer} 
-                hydeAnswer={result.hyde_answer} 
-                baselineEnglish={result.baseline_answer_in_english}
-                hydeEnglish={result.hyde_answer_in_english}
-                showEnglish={showEnglish}
+
+              <AnswerCard
+                title={result.mode === 'agent' ? 'Agent' : 'HyDE'}
+                label={result.mode === 'agent' ? 'Tool-based research mode' : 'HyDE RAG answer'}
+                answer={showEnglish && result.answer_in_english ? result.answer_in_english : result.answer}
+                icon={
+                  result.mode === 'agent'
+                    ? <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.5h-2V15h2zm1.9-6.1-1 .9A3.1 3.1 0 0 0 13 13h-2v-.5a4.1 4.1 0 0 1 1.2-2.9l1.3-1.2a1.7 1.7 0 1 0-2.9-1.2H8.6a3.7 3.7 0 1 1 6.3 2.5z" />
+                    : <path d="M12 2l2.4 7.6H22l-6.2 4.5 2.4 7.5L12 17.1l-6.2 4.5 2.4-7.5L2 9.6h7.6z" />
+                }
+                bgGradient={result.mode === 'agent' ? 'bg-gradient-to-r from-slate-700 to-gray-800' : 'bg-gradient-to-r from-purple-600 to-violet-600'}
               />
             </div>
           )}
@@ -472,9 +491,9 @@ export function Chat({ user, onLogout }) {
                   <path d="M12 1L3 5v6c0 5.25 3.75 10.15 9 11.35C17.25 21.15 21 16.25 21 11V5L12 1z" />
                 </svg>
               </div>
-              <p className="text-sm font-semibold text-gray-600 mb-1">Compare baseline RAG with HyDE RAG</p>
+              <p className="text-sm font-semibold text-gray-600 mb-1">Ask with HyDE or Agent mode</p>
               <p className="text-xs text-gray-400 max-w-xs leading-relaxed">
-                Ask a Nepali legal question and inspect how standard retrieval differs from SLM-generated HyDE retrieval.
+                Use HyDE for quick answers, or switch to Agent for deeper questions.
               </p>
             </div>
           )}
@@ -483,7 +502,7 @@ export function Chat({ user, onLogout }) {
 
       <footer className="border-t border-purple-100 bg-white">
         <div className="max-w-5xl mx-auto px-5 h-10 flex items-center justify-between">
-          <span className="text-[11px] text-gray-500">Dipsan99 · Baseline vs HyDE RAG · Qwen2.5 + LaBSE + FAISS</span>
+          <span className="text-[11px] text-gray-500">Dipsan99 · HyDE + Agent · Qwen2.5 + LaBSE + FAISS</span>
           <div className="flex items-center gap-4">
             <a
               href="https://huggingface.co/zeri000/nepali_legal_qwen_merged_4"
