@@ -24,12 +24,14 @@ class ForumAuthor(BaseModel):
     sub: str
     name: str
     picture: Optional[str] = None
+    role: Optional[str] = None
 
 
 class QuestionCreate(BaseModel):
     title: str = Field(min_length=1, max_length=140)
     body: Optional[str] = Field(default=None, max_length=4000)
     tags: list[str] = Field(default_factory=list, max_length=6)
+    author_role: Optional[str] = Field(default=None, max_length=40)
 
 
 class AnswerCreate(BaseModel):
@@ -102,6 +104,7 @@ def row_to_question(row) -> QuestionOut:
             sub=row["author_sub"],
             name=row["author_name"],
             picture=row["author_picture"],
+            role=(row["author_role"] or None),
         ),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -184,13 +187,14 @@ def create_question(req: QuestionCreate, authorization: Optional[str] = Header(N
     if not title:
         raise HTTPException(status_code=400, detail="Title is required")
     body = (req.body or "").strip()
+    author_role = (req.author_role or "").strip()
 
     with get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             """
-            INSERT INTO questions (title, body, tags, author_sub, author_name, author_picture, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO questions (title, body, tags, author_sub, author_name, author_picture, author_role, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 title,
@@ -199,6 +203,7 @@ def create_question(req: QuestionCreate, authorization: Optional[str] = Header(N
                 user.sub,
                 user.name,
                 user.picture,
+                author_role,
                 now,
                 now,
             ),

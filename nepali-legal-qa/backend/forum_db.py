@@ -35,6 +35,7 @@ def init_db() -> None:
                 author_sub TEXT NOT NULL,
                 author_name TEXT NOT NULL,
                 author_picture TEXT,
+                author_role TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 upvotes INTEGER NOT NULL DEFAULT 0,
@@ -62,6 +63,13 @@ def init_db() -> None:
         cur.execute("CREATE INDEX IF NOT EXISTS idx_questions_created ON questions(created_at)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_questions_updated ON questions(updated_at)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_answers_question_id ON answers(question_id)")
+
+        # Lightweight migration: add author_role to existing databases.
+        columns = {
+            row["name"] for row in cur.execute("PRAGMA table_info(questions)").fetchall()
+        }
+        if "author_role" not in columns:
+            cur.execute("ALTER TABLE questions ADD COLUMN author_role TEXT NOT NULL DEFAULT ''")
 
 
 def normalize_tags(raw_tags: list[str]) -> list[str]:
