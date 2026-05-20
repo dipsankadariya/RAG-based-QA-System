@@ -43,13 +43,29 @@ log = logging.getLogger(__name__)
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"), override=False)
 
 
+def _clean_env(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
+
+
+def _is_groq_auth_error(exc: Exception) -> bool:
+    try:
+        from groq import AuthenticationError
+
+        return isinstance(exc, AuthenticationError)
+    except Exception:
+        return "invalid_api_key" in str(exc).lower()
+
+
 MODEL_ID = os.getenv("MODEL_ID", "zeri000/nepali_legal_qwen_merged_4")
-DOC_FILE_PATH = os.getenv("DOC_FILE_PATH", "../../../augmented_nepali_legal_rag.txt")
+DOC_FILE_PATH = _clean_env(os.getenv("DOC_FILE_PATH")) or "../../../augmented_nepali_legal_rag.txt"
 GROQ_KEYS = [
-    os.getenv("GROQ_API_KEY"),
-    os.getenv("GROQ_API_KEY_2"),
-    os.getenv("GROQ_API_KEY_3"),
-    os.getenv("GROQ_API_KEY_4"),
+    _clean_env(os.getenv("GROQ_API_KEY")),
+    _clean_env(os.getenv("GROQ_API_KEY_2")),
+    _clean_env(os.getenv("GROQ_API_KEY_3")),
+    _clean_env(os.getenv("GROQ_API_KEY_4")),
 ]
 
 device = "cpu"
@@ -327,7 +343,7 @@ async def load_agent():
         else:
             log.warning("Agent mode disabled: %s", status.error)
     except Exception as exc:
-        log.warning("Agent startup failed (HyDE still available): %s", exc)
+        log.exception("Agent startup failed (HyDE still available): %s", exc)
     
     
 
@@ -489,7 +505,16 @@ async def query(req: QueryRequest, authorization: Optional[str] = Header(None)):
         answer = generate_hyde_answer_final(question, draft, current_generator)
     except Exception as exc:
         log.exception("HyDE answer generation failed")
-        answer = f"HyDE answer error: {exc}"
+        if _is_groq_auth_error(exc):
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Groq authentication failed (invalid API key). "
+                    "Re-check GROQ_API_KEY in Colab Secrets / environment (no quotes, no spaces) or generate a new key."
+                ),
+            )
+
+        raise HTTPException(status_code=503, detail=f"HyDE answer generation failed: {exc}")
 
     answer_in_english = None
     try:
