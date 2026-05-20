@@ -1,18 +1,34 @@
 import { useEffect, useRef, useState } from 'react'
 
-// Add animations
-const style = document.createElement('style')
-style.textContent = `
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-`
-document.head.appendChild(style)
+// Add animations and media query styles
+let styleInjected = false
+function injectStyles() {
+  if (styleInjected) return
+  styleInjected = true
+  
+  const style = document.createElement('style')
+  style.textContent = `
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .login-left-section {
+      display: none;
+    }
+    @media (min-width: 1024px) {
+      .login-left-section {
+        display: flex;
+      }
+    }
+  `
+  document.head.appendChild(style)
+}
+
+injectStyles()
 
 export function GoogleLoginButton({ onLoginSuccess, onLoginError }) {
   const buttonRef = useRef(null)
@@ -22,6 +38,26 @@ export function GoogleLoginButton({ onLoginSuccess, onLoginError }) {
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) {
       console.warn('VITE_GOOGLE_CLIENT_ID not set in environment')
+      setIsLoading(false)
+      return
+    }
+
+    // Check if Google GSI is already loaded
+    if (window.google?.accounts?.id) {
+      // Already loaded, just initialize if needed
+      if (buttonRef.current && !window.google.accounts.id._isInitialized) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleCredentialResponse,
+        })
+        window.google.accounts.id.renderButton(buttonRef.current, {
+          theme: 'outline',
+          size: 'large',
+          locale: 'en',
+          width: '400',
+        })
+        window.google.accounts.id._isInitialized = true
+      }
       setIsLoading(false)
       return
     }
@@ -45,6 +81,7 @@ export function GoogleLoginButton({ onLoginSuccess, onLoginError }) {
           locale: 'en',
           width: '400',
         })
+        window.google.accounts.id._isInitialized = true
         setIsLoading(false)
       }
     }
@@ -72,6 +109,7 @@ export function GoogleLoginButton({ onLoginSuccess, onLoginError }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
         },
         credentials: 'include',
         body: JSON.stringify({ token: response.credential }),
@@ -130,8 +168,7 @@ export function LoginCard({ onLoginSuccess }) {
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #EDE8DC, #F5F0E6)', display: 'flex' }}>
       {/* Left Side - Visual Section */}
-      <div style={{
-        display: 'none',
+      <div className="login-left-section" style={{
         width: '50%',
         background: 'linear-gradient(to bottom right, #8B7355, #6B563D)',
         position: 'relative',
@@ -140,7 +177,6 @@ export function LoginCard({ onLoginSuccess }) {
         alignItems: 'center',
         justifyContent: 'center',
         padding: '48px',
-        '@media (min-width: 1024px)': { display: 'flex' }
       }}>
         {/* Decorative Elements */}
         <div style={{
