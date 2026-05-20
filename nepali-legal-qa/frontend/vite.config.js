@@ -16,6 +16,9 @@ export default defineConfig(({ mode }) => {
         '/api/forum': {
           target: forumTarget,
           changeOrigin: true,
+          headers: {
+            'ngrok-skip-browser-warning': 'true',
+          },
         },
         '/api': {
           target: proxyTarget,
