@@ -202,17 +202,17 @@ async def init_agent() -> None:
         # ── Nodes ─────────────────────────────────────────
         assistant_sys = SystemMessage(content=SYSTEM_PROMPT)
 
-        async def assistant_node(state: MessagesState):
+        async def assistant_node(state):
             response = await llm_with_tools.ainvoke([assistant_sys] + state["messages"])
             return {"messages": [response]}
 
-        def translator_node(state: MessagesState):
+        def translator_node(state):
             query = state["messages"][-1].content
             response = translator_chain.invoke({"query": query})
             return {"messages": [response]}
 
         # ── Router at START ───────────────────────────────
-        def router1(state: MessagesState) -> Literal["assistant", "translator"]:
+        def router1(state) -> Literal["assistant", "translator"]:
             query = state["messages"][-1].content
             try:
                 result = language_detector.invoke({"text": query})
