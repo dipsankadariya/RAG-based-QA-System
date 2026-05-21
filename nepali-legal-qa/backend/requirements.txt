@@ -16,6 +16,11 @@ langchain-huggingface
 langchain-community
 langchain-text-splitters
 
+# ── Agent mode (LangGraph + MCP + Gemini) ───────────────────────
+langgraph
+langchain-mcp-adapters
+langchain-google-genai
+
 # ── Vector store ──────────────────────────────────────────────────
 faiss-cpu
 
