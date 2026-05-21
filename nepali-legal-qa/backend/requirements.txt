@@ -35,3 +35,10 @@ google-auth-oauthlib>=1.2.0
 google-auth>=2.28.0
 python-jose[cryptography]>=3.3.0
 PyJWT>=2.8.1
+
+
+#langchain and langgraph 
+langgraph==1.2.0
+langchain-groq==1.1.2
+langchain-mcp-adapters==0.2.2
+langchain-google-genai==4.2.2
