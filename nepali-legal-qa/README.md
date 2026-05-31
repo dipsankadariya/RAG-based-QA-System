@@ -1,287 +1,208 @@
-# Nepali Legal QA — Fine-tuned SLM + HyDE RAG
+# Nyay (न्याय) — Nepali Legal AI + Research Agent + Community Forum
 
-**Final Year College Project** — Research prototype exploring whether a domain fine-tuned SLM with HyDE retrieval gives better results than a standard RAG pipeline for Nepali legal question answering.
+**Final Year Project** — A web-based legal assistance platform that combines:
 
-> **Note:** Any API keys visible in old notebook outputs were hardcoded for testing purposes only and have since been revoked.
+1) **Instant legal Q&A** using a fine‑tuned small language model (SLM) + **HyDE RAG** for localized Nepali retrieval.
+2) **Deep legal research** using a **LangGraph agent** that tool‑calls an external document index to fetch cases, verdicts, and official decisions.
+3) A **Reddit‑style forum** so citizens, students, and lawyers can discuss and crowd‑verify legal insights.
 
----
-
-## What is HyDE and why we used it
-
-Standard RAG embeds the user's question directly and searches for similar passages. The problem is that a short Nepali question and a long legal answer sit in very different places in embedding space, so retrieval often misses relevant docs.
-
-HyDE fixes this: instead of embedding the question, we first ask the SLM to generate a *hypothetical answer*, embed that, and use it to search. A hypothetical answer is semantically much closer to real answer passages — improving retrieval quality, especially in a low-resource language like Nepali.
+This is not “just an AI wrapper”: the project includes SLM fine‑tuning, retrieval engineering, agentic tool use, authentication, and a full-stack web app.
 
 ---
 
-## Pipeline
+## System description (high level)
 
-```
-User Question (Nepali / English)
-        │
-        ▼
-Fine-tuned SLM (zeri000/nepali_legal_qwen_merged_4)
-generates a hypothetical legal passage             [HyDE]
-        │
-        ▼
-sentence-transformers/LaBSE embeds the hypothetical passage
-        │
-        ▼
-FAISS searches augmented_nepali_legal_rag.txt → Top 3 chunks
-        │
-        ▼
-Groq llama-3.3-70b-versatile generates the final Nepali answer
-(Round-robin across 4 API keys)
-```
+**Goal:** Make complex Nepali legal information accessible, with a safety net for edge cases.
 
----
+### Layer 1 — Instant Q&A (HyDE RAG)
 
-## Architecture
+- A fine‑tuned **Qwen2.5‑1.5B** model generates a **HyDE (hypothetical) legal passage** from the user question.
+- The HyDE passage is embedded with **LaBSE** and retrieved against a **FAISS** vector index built from `augmented_nepali_legal_rag.txt`.
+- A hosted LLM on **Groq** synthesizes the final answer in Nepali (and optionally generates an English rendering).
 
-```
-┌──────────────────────────────────┐       ┌──────────────────────────────────┐
-│ GOOGLE COLAB (GPU T4)            │       │ LOCAL MACHINE                    │
-│ collab-backend.ipynb             │       │ frontend/ (React + Vite)         │
-│ - uvicorn main:app :8000         │◄──────┤ - npm run dev :3000              │
-│ backend/main.py (RAG API)        │       │ forum_api.py (SQLite) :8001      │
-│ /api/query                       │       │ /api/forum/*                     │
-└──────────────────────────────────┘       └──────────────────────────────────┘
-```
+Why HyDE: Nepali questions are short, but legal answers are long; HyDE improves retrieval by embedding something closer to the target answer space.
+
+### Layer 2 — Deep research (LangGraph Agent)
+
+- For research-grade queries, the system switches to **Agent mode**.
+- A **LangGraph** workflow orchestrates tool usage via an **MCP (Model Context Protocol)** server (PageIndex).
+- The agent is intentionally **grounded**: it answers only using retrieved pages from the indexed documents.
+- Non‑English inputs are translated to “proper English” before tool navigation to improve document search.
+
+### Layer 3 — Human collaboration (Community Forum)
+
+- A separate **forum service** supports questions, threaded answers, and voting.
+- This acts as a human safety net: users can validate, debate, and refine advice in public threads.
 
 ---
 
-## Project structure
+## Technical architecture
 
 ```
-RAG-based-QA-System/
-├── nepali_rag_qa.ipynb               ← Original RAG research notebook
-├── Complete_slm_finetune.ipynb        ← SLM fine-tuning pipeline (Kaggle)
-├── collab-backend.ipynb               ← Run this in Google Colab (GPU)
-│
-├── ragas_evaluation_simple_rag_165_datas.csv        ← RAGAS evaluation data
-├── ragas_evaluation_qa_own_finetune_nepali_hyde_151.csv
-├── ragas_evaluation_qa_nepali_hyde (1).csv
-│
-└── nepali-legal-qa/
-    ├── README.md
-    ├── .gitignore
-    │
-   ├── backend/
-   │   ├── main.py               ← RAG FastAPI app (Colab)
-   │   ├── forum_api.py          ← Forum FastAPI app (local)
-   │   ├── forum_db.py           ← SQLite helpers
-   │   ├── requirements.txt      ← Python dependencies
-   │   └── .env.example          ← Config reference
-    │
-    └── frontend/
-        ├── src/
-        │   ├── App.jsx           ← React UI
-        │   ├── main.jsx
-        │   └── index.css
-        ├── .env                  ← Set VITE_API_BASE here (gitignored)
-        ├── .env.example          ← Frontend config reference
-        ├── vite.config.js        ← Proxies /api/* to Colab backend
-        └── package.json
+┌─────────────────────────────────────────────────────────────────────┐
+│                            Frontend (Web)                           │
+│ React + Vite + Tailwind                                              │
+│ - Login (Google)  - Chat (HyDE / Agent)  - Forum (threads + votes)   │
+└───────────────▲───────────────────────────────────────────▲─────────┘
+                │                                           │
+                │ /api/* via Vite proxy                      │ /api/forum/*
+                │                                           │
+┌───────────────┴──────────────────────────┐   ┌────────────┴──────────────┐
+│ QA Backend (FastAPI)                     │   │ Forum Backend (FastAPI)     │
+│ backend/main.py                           │   │ backend/forum_api.py        │
+│ - HyDE RAG pipeline                        │   │ - SQLite persistence         │
+│ - Agent mode (LangGraph + MCP)             │   │ - Questions/answers/votes    │
+│ - Google OAuth → JWT                       │   └───────────────────────────┘
+└───────────────┬──────────────────────────┘
+                │
+     ┌──────────┴───────────┐
+     │ External services     │
+     │ - Groq (LLM API)      │
+     │ - PageIndex MCP (docs)│
+     │ - Gemini (agent LLM)  │
+     └──────────────────────┘
 ```
+
+Deployment pattern used for demos:
+
+- **HyDE backend on Google Colab (GPU)** + **ngrok** public URL (easy CUDA access)
+- **Forum backend on local machine** (SQLite)
+- **Frontend on local machine** (Vite dev server)
+
+---
+
+## Tech stack
+
+### Frontend
+
+- React 18, React Router
+- Vite dev server + proxy
+- Tailwind CSS
+- Markdown rendering for answers (`react-markdown`, `remark-gfm`)
+
+### Backend (QA + Auth)
+
+- FastAPI + Uvicorn + Pydantic
+- HyDE/RAG: HuggingFace Transformers, PyTorch, Sentence-Transformers (LaBSE), FAISS
+- Orchestration: LangChain
+- LLM providers:
+  - Groq for answer/refinement + translation utilities
+  - Gemini (Google Generative AI) for agent reasoning/tool-calling
+- Agent tools: LangGraph + MCP client (`langchain-mcp-adapters`) + PageIndex MCP server
+- Auth: Google OAuth (ID token verification) → JWT (`python-jose`, `PyJWT`)
+
+### Backend (Forum)
+
+- FastAPI
+- SQLite (local persistence)
 
 ---
 
 ## Models and data
 
-| | |
+| Component | Used for |
 |---|---|
-| Base model | `unsloth/Qwen2.5-1.5B-Instruct` |
-| Fine-tuned SLM | [zeri000/nepali_legal_qwen_merged_4](https://huggingface.co/zeri000/nepali_legal_qwen_merged_4) |
-| SLM role | HyDE hypothetical-passage generation only |
-| Embedding model | `sentence-transformers/LaBSE` |
-| Answer LLM | `llama-3.3-70b-versatile` via Groq (round-robin, 4 keys) |
-| RAG corpus | `augmented_nepali_legal_rag.txt` (upload to Colab manually) |
-| Eval dataset | `ragas_evaluation_simple_rag_165_datas.csv` (165 Q&A pairs) |
+| Base SLM | `Qwen2.5-1.5B-Instruct` |
+| Fine-tuned SLM | `zeri000/nepali_legal_qwen_merged_4` (HyDE generation only) |
+| Embeddings | `sentence-transformers/LaBSE` |
+| Vector store | FAISS (built at startup from the corpus text file) |
+| Hosted LLM | Groq (answer synthesis + refinement + English rendering) |
+| RAG corpus | `augmented_nepali_legal_rag.txt` (not committed; must be provided) |
 
-**Fine-tuning setup:** LoRA (rank 16, alpha 32) — 1.78% of parameters trained. 3 epochs, ~10.5K samples, Tesla T4, ~2h 45min, final val loss ~0.415.
+Fine-tuning notes (project report): LoRA fine-tuning on a Nepali legal QA dataset to improve HyDE passage quality.
 
 ---
 
-## ▶ How to run the application
+## How to run
+
+This repo is set up so you can run **HyDE mode**, **Agent mode**, and the **Forum** independently.
 
 ### Prerequisites
 
-| Tool | Where |
-|---|---|
-| Google account | For Colab GPU |
-| Groq API keys (×4) | [console.groq.com](https://console.groq.com) — free tier |
-| ngrok account + token | [ngrok.com](https://ngrok.com) — free tier |
-| Node.js 18+ | Local machine |
-| `augmented_nepali_legal_rag.txt` | Must be uploaded to Colab manually |
+- Node.js 18+
+- Python 3.10–3.12 recommended (PyTorch wheels are not always available for the newest Python versions)
+
+Optional (depending on modes):
+
+- **Groq API key(s)** for HyDE answering
+- **Google OAuth Client ID** for login
+- **PAGEINDEX_API_KEY + GOOGLE_API_KEY** for Agent mode
+
+### 1) QA backend (FastAPI)
+
+From `nepali-legal-qa/backend`:
+
+```bash
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+Configuration:
+
+- Copy `backend/.env.example` → `backend/.env` and fill required keys.
+- Provide the corpus file path via `DOC_FILE_PATH` (and ensure it exists where the server runs).
+
+Notes:
+
+- If HyDE dependencies are missing, **HyDE mode will be disabled** but the server can still start for **Agent mode**.
+- `GET /api/health` reports whether HyDE and Agent are “ready”.
+
+### 2) Forum backend (FastAPI + SQLite)
+
+From `nepali-legal-qa/backend`:
+
+```bash
+uvicorn forum_api:app --reload --port 8001
+```
+
+Optional: seed sample threads
+
+```bash
+python seed_forum.py
+```
+
+### 3) Frontend (React)
+
+From `nepali-legal-qa/frontend`:
+
+```bash
+npm install
+npm run dev
+```
+
+Environment:
+
+- Copy `frontend/.env.example` → `frontend/.env` and set:
+  - `VITE_API_BASE` (QA backend base URL; can be an ngrok URL or `http://localhost:8000`)
+  - `VITE_FORUM_API_BASE` (default `http://localhost:8001`)
+- Add Google login config (recommended) in `frontend/.env.local`:
+  - `VITE_GOOGLE_CLIENT_ID=...`
+
+The current UI protects all routes behind login, so `VITE_GOOGLE_CLIENT_ID` is required to use the app end-to-end.
+
+The Vite proxy forwards `/api/*` requests to the configured targets, avoiding CORS issues.
 
 ---
 
-### Step 1 — Start the RAG backend in Google Colab
+## Minimal API surface (for integration)
 
-1. Open **[collab-backend.ipynb](./collab-backend.ipynb)** in [Google Colab](https://colab.research.google.com)
-
-2. Set runtime: **Runtime → Change runtime type → GPU (T4)**
-
-3. **Run Cell 1** — clones the repo and installs dependencies:
-   ```python
-   !git clone https://github.com/dipsankadariya/RAG-based-QA-System.git
-   %cd RAG-based-QA-System/nepali-legal-qa/backend
-   !pip install -r requirements.txt
-   !pip install pyngrok
-   ```
-   When the HuggingFace login prompt appears, paste a **read-access HF token**.
-
-4. **Upload `augmented_nepali_legal_rag.txt`** to `/content/` in Colab
-   (Files panel on the left → Upload)
-
-5. **Run Cell 2** — set API keys and start ngrok:
-   ```python
-   import os
-   from google.colab import userdata
-
-   os.environ["GROQ_API_KEY"]   = userdata.get("GROQ_API_KEY")
-   os.environ["GROQ_API_KEY_2"] = userdata.get("GROQ_API_KEY_2")
-   os.environ["GROQ_API_KEY_3"] = userdata.get("GROQ_API_KEY_3")
-   os.environ["GROQ_API_KEY_4"] = userdata.get("GROQ_API_KEY_4")
-
-   from pyngrok import ngrok
-   ngrok.set_auth_token(userdata.get("NGROK_TOKEN"))
-   public_url = ngrok.connect(8000, "http")
-   print(public_url)   # e.g. https://xxxx-xxxx.ngrok-free.app
-   ```
-   📋 **Copy this URL** — you need it in Step 3.
-
-6. **Run Cell 3** — start the FastAPI server (keep this cell running):
-   ```
-   !uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1 --timeout-keep-alive 120
-   ```
-   Wait for: `Application startup complete.`
-
-7. **Verify** the backend is live:
-   ```bash
-   curl https://xxxx-xxxx.ngrok-free.app/api/health
-   ```
-   Expected response:
-   ```json
-   {"status":"ok","model":"zeri000/nepali_legal_qwen_merged_4","device":"cuda","has_vector_store":true,"has_llm":true}
-   ```
-
----
-
-### Step 2 — Start the forum backend locally (fast demo)
-
-1. Open a new terminal:
-   ```bash
-   cd nepali-legal-qa/backend
-   ```
-
-2. Start the forum API (SQLite):
-   ```bash
-   uvicorn forum_api:app --reload --port 8001
-   ```
-
-### Step 3 — Start the frontend locally
-
-1. Open a terminal, navigate to the frontend directory:
-   ```bash
-   cd nepali-legal-qa/frontend
-   ```
-
-2. Install dependencies (first time only):
-   ```bash
-   npm install
-   ```
-
-3. Set the backend URL — edit `frontend/.env`:
-   ```env
-   VITE_API_BASE=https://xxxx-xxxx.ngrok-free.app
-   VITE_FORUM_API_BASE=http://localhost:8001
-   ```
-   > ⚠️ **This URL changes every Colab session.** Update `.env` and restart `npm run dev` each time.
-
-4. Start the dev server:
-   ```bash
-   npm run dev
-   ```
-   Open **[http://localhost:3000](http://localhost:3000)** in your browser.
-
----
-
-### How requests flow
-
-```
-Browser → localhost:3000/api/query
-              ↓
-    Vite dev server (proxy)
-              ↓
-    https://xxxx.ngrok-free.app/api/query
-              ↓
-    FastAPI on Google Colab (:8000)
-              ↓
-    [1] Local SLM generates HyDE passage (CUDA)
-    [2] LaBSE embeds it → FAISS retrieves top 3 chunks
-    [3] Groq llama-3.3-70b answers in Nepali
-
-Browser → localhost:3000/api/forum/*
-           ↓
-   Vite dev server (proxy)
-           ↓
-   http://localhost:8001/api/forum/*
-           ↓
-   Forum FastAPI (SQLite)
-```
-
-The Vite proxy handles CORS and ngrok headers automatically.
-
----
-
-## API reference
-
-### `GET /api/health`
-```json
-{
-  "status": "ok",
-  "model": "zeri000/nepali_legal_qwen_merged_4",
-  "device": "cuda",
-  "has_vector_store": true,
-  "has_llm": true
-}
-```
-
-### `POST /api/query`
-
-**Request:**
-```json
-{
-  "question": "नेपालमा सम्बन्ध विच्छेद कसरी गर्ने?",
-  "top_k": 3
-}
-```
-
-**Response:**
-```json
-{
-  "question": "नेपालमा सम्बन्ध विच्छेद कसरी गर्ने?",
-  "hyde_passage": "...[hypothetical legal passage from SLM]...",
-  "retrieved_docs": ["[chunk 1]", "[chunk 2]", "[chunk 3]"],
-  "answer": "...[final answer in Nepali from Groq]...",
-  "processing_time": 14.2
-}
-```
+- `POST /api/query` with `mode: "hyde" | "agent"`
+- `POST /api/auth/google` (Google ID token → JWT)
+- Forum under `/api/forum/*` (threads, answers, voting)
 
 ---
 
 ## Known limitations
 
-- SLM occasionally loops or hallucinates on complex legal queries — known with small models on low-resource languages
-- FAISS index is built from QA-format data, so retrieval quality is bounded by corpus coverage
-- ngrok free-tier URL expires on every Colab session restart
+- Retrieval quality depends on corpus coverage and chunking.
+- Agent mode depends on external document indexing (PageIndex MCP) and availability of API keys.
+- Demo deployments via ngrok have a changing URL per session.
 
 ---
 
 ## Contributors
 
-| | |
+| Member | Contributions |
 |---|---|
-| **Dipsan Kadariya** | SLM fine-tuning · Frontend (`Complete_slm_finetune.ipynb`, `frontend/`) |
-| **Ritesh Raut** | HyDE-RAG pipeline · Backend (`nepali_rag_qa.ipynb`, `backend/`) |
+| Dipsan Kadariya | SLM fine-tuning, frontend, system integration |
+| Ritesh Raut | HyDE-RAG pipeline, backend, evaluation |

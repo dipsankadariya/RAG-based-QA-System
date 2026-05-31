@@ -139,7 +139,7 @@ export function About({ user, onLogout }) {
               <li>• <strong>HyDE Retrieval System</strong> — Generates hypothetical legal passages for better semantic matching</li>
               <li>• <strong>LaBSE Embeddings</strong> — Multilingual embeddings for semantic understanding in Nepali and English</li>
               <li>• <strong>FAISS Vector Store</strong> — Efficient similarity search over Constitution and legal documents</li>
-              <li>• <strong>Groq LLaMA 3.3 (70B)</strong> — High-speed final answer generation with multiple API keys for reliability</li>
+              <li>• <strong>Groq Hosted LLM</strong> — High-speed final answer generation (round-robin API keys for reliability)</li>
               <li>• <strong>MCP Agent</strong> — Advanced agent for complex research queries requiring multi-step reasoning</li>
             </ul>
           </div>

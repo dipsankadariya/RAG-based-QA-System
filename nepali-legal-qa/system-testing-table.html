@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Table 3.1 System testing table</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #ffffff;
+      color: #000;
+      font-family: "Times New Roman", Times, serif;
+      font-size: 11pt;
+      line-height: 1.25;
+    }
+    .page {
+      padding: 36px 44px;
+    }
+    .caption {
+      text-align: center;
+      font-size: 12pt;
+      margin: 0 0 10px;
+    }
+    .table-wrap {
+      display: flex;
+      justify-content: center;
+    }
+    table {
+      width: 86%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    th, td {
+      border: 1px solid #000;
+      padding: 3px 5px;
+      vertical-align: top;
+      word-wrap: break-word;
+    }
+    th {
+      font-weight: 700;
+      text-align: left;
+    }
+    .col-id { width: 12%; }
+    .col-desc { width: 34%; }
+    .col-input { width: 16%; }
+    .col-exp { width: 16%; }
+    .col-act { width: 16%; }
+    .col-status { width: 6%; text-align: center; }
+    .status-pass { font-weight: 700; }
+    @media print {
+      .page { padding: 0; }
+      table { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <p class="caption">Table 3.1 System testing table</p>
+    <div class="table-wrap">
+      <table aria-label="System testing table">
+        <thead>
+          <tr>
+            <th class="col-id">Test Case ID</th>
+            <th class="col-desc">Description</th>
+            <th class="col-input">Input</th>
+            <th class="col-exp">Expected Output</th>
+            <th class="col-act">Actual Output</th>
+            <th class="col-status">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>TC001</td><td>Login page loads when user is not authenticated</td><td>Open app URL</td><td>Redirects to login page</td><td>Redirected to login page</td><td class="status-pass">PASS</td></tr>
+          <tr><td>TC002</td><td>Google Sign-In generates JWT token</td><td>Valid Google account</td><td>Token returned and saved</td><td>Token returned and saved</td><td class="status-pass">PASS</td></tr>
+          <tr><td>TC003</td><td>Verify token returns current user</td><td>Authorization: Bearer &lt;jwt&gt;</td><td>User details returned</td><td>User details returned</td><td class="status-pass">PASS</td></tr>
+          <tr><td>TC004</td><td>Forum API health endpoint works</td><td>GET /api/forum/health</td><td>{status: "ok"}</td><td>{status: "ok"}</td><td class="status-pass">PASS</td></tr>
+          <tr><td>TC005</td><td>Forum list loads threads from database</td><td>Open /forum</td><td>Threads displayed</td><td>Threads displayed</td><td class="status-pass">PASS</td></tr>
+          <tr><td>TC006</td><td>Create a new forum question</td><td>POST /api/forum/questions</td><td>Question created</td><td>Question created</td><td class="status-pass">PASS</td></tr>
+          <tr><td>TC007</td><td>Open question details with answers</td><td>GET /api/forum/questions/{id}</td><td>Question + answers shown</td><td>Question + answers shown</td><td class="status-pass">PASS</td></tr>
+          <tr><td>TC008</td><td>Post an answer to a question</td><td>POST /api/forum/questions/{id}/answers</td><td>Answer added and count updated</td><td>Answer added and count updated</td><td class="status-pass">PASS</td></tr>
+          <tr><td>TC009</td><td>Upvote a question</td><td>POST /api/forum/questions/{id}/vote (value=1)</td><td>Upvote increments</td><td>Upvote increments</td><td class="status-pass">PASS</td></tr>
+          <tr><td>TC010</td><td>Upvote an answer</td><td>POST /api/forum/answers/{aid}/vote (value=1)</td><td>Answer upvote increments</td><td>Answer upvote increments</td><td class="status-pass">PASS</td></tr>
+          <tr><td>TC011</td><td>RAG API health endpoint shows readiness</td><td>GET /api/health</td><td>System status returned</td><td>System status returned</td><td class="status-pass">PASS</td></tr>
+          <tr><td>TC012</td><td>HyDE RAG query returns Nepali legal answer</td><td>POST /api/query (mode=hyde)</td><td>Nepali answer returned</td><td>Nepali answer returned</td><td class="status-pass">PASS</td></tr>
+          <tr><td>TC013</td><td>Agent mode query returns answer</td><td>POST /api/query (mode=agent)</td><td>Answer returned</td><td>Answer returned</td><td class="status-pass">PASS</td></tr>
+          <tr><td>TC014</td><td>Frontend proxy avoids CORS issues</td><td>Browser calls /api/*</td><td>No CORS error</td><td>No CORS error</td><td class="status-pass">PASS</td></tr>
+          <tr><td>TC015</td><td>Forum data persists after backend restart</td><td>Restart forum API</td><td>Existing threads remain</td><td>Existing threads remain</td><td class="status-pass">PASS</td></tr>
+          <tr><td>TC016</td><td>Logout protects routes</td><td>Logout then open /forum</td><td>Redirects to login</td><td>Redirects to login</td><td class="status-pass">PASS</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>
